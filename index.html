@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Travel Tick</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --primary-color: #2ecc71; /* Teal/Green */
+            --accent-color: #fff;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            font-family: var(--font-family); background-color: var(--bg-color);
+            overflow: hidden; /* Verhindert Scrollen außerhalb der Karte */
+        }
+
+        /* Start-Animation */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--primary-color); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 9999;
+            transition: opacity 1s ease-out, visibility 1s;
+        }
+        #splash-screen.fade-out { opacity: 0; visibility: hidden; }
+        .logo-icon { font-size: 80px; color: var(--accent-color); animation: pulse 2s infinite; }
+        .app-name { font-size: 28px; color: var(--accent-color); font-weight: bold; margin-top: 15px; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        /* App-Layout */
+        #app-container { display: flex; flex-direction: column; height: 100%; width: 100%; }
+        
+        /* Header-Leiste */
+        #header {
+            height: 60px; background-color: var(--accent-color);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000;
+        }
+        #header h1 { font-size: 20px; color: var(--text-color); margin: 0; }
+        #counter { font-size: 16px; color: var(--text-color); font-weight: bold; }
+
+        /* Karten-Container */
+        #map { flex: 1; width: 100%; z-index: 1; }
+        
+        /* Minimalistisches Popup */
+        .leaflet-popup-content { font-family: var(--font-family); text-align: center; font-size: 14px; }
+        .tick-btn {
+            background-color: var(--primary-color); color: var(--accent-color);
+            border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer;
+            margin-top: 5px; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="splash-screen">
+        <div class="logo-icon">✓</div>
+        <div class="app-name">Travel Tick</div>
+    </div>
+
+    <div id="app-container">
+        <div id="header">
+            <h1>Travel Tick</h1>
+            <div id="counter">Länder: <span id="visited-count">0</span> / 195</div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Start-Animation nach 2 Sekunden ausblenden
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('splash-screen').classList.add('fade-out');
+            }, 2000);
+        });
+
+        // KARTEN-LOGIK
+
+        // 1. Initialisierung der Karte (Zentriert auf die Welt)
+        const map = L.map('map', {
+            center: [20, 0],
+            zoom: 2,
+            minZoom: 2,
+            maxBounds: [[-90, -180], [90, 180]], // Verhindert endloses Scrollen
+            worldCopyJump: true // Karte springt zurück, wenn man über den Rand scrollt
+        });
+
+        // 2. Minimalistisches Karten-Design laden (CartoDB Positron)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // 3. Status-Variablen
+        let visitedCountries = JSON.parse(localStorage.getItem('visitedCountries')) || []; // Lädt gespeicherte Länder
+        const totalCountries = 195; // Ungefähre Anzahl der Länder
+        const markerLayer = L.layerGroup().addTo(map); // Schicht für die Pins
+
+        // 4. Update-Funktion für die Anzeige
+        function updateDisplay() {
+            document.getElementById('visited-count').innerText = visitedCountries.length;
+            localStorage.setItem('visitedCountries', JSON.stringify(visitedCountries)); // Speichert lokal am Handy [cite: 2026-02-23]
+        }
+
+        // 5. Funktion zum Hinzufügen eines Landes
+        function toggleCountry(countryName) {
+            const index = visitedCountries.indexOf(countryName);
+            if (index > -1) {
+                // Land ist schon markiert -> Entfernen
+                visitedCountries.splice(index, 1);
+            } else {
+                // Land ist neu -> Hinzufügen
+                visitedCountries.push(countryName);
+            }
+            updateDisplay();
+            map.closePopup();
+            // In einer Profi-Version würde man hier die Farbe des Landes ändern.
+            // Für das MVP setzen wir stattdessen temporäre Pins.
+        }
+
+        // 6. Demo-Länderliste (Hier würde man normalerweise eine vollständige GeoJSON-Liste laden)
+        // Um den Code kurz zu halten, setzen wir temporär Pins beim Klick.
+        map.on('click', function(e) {
+            // Dies ist ein Platzhalter. Eine echte Länder-Erkennung braucht eine GeoJSON-Datei.
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            const countryName = `Ort (${lat.toFixed(2)}, ${lng.toFixed(2)})`; // Temporärer Name
+
+            L.popup()
+                .setLatLng(e.latlng)
+                .setContent(`
+                    <b>${countryName}</b><br>
+                    <button class="tick-btn" onclick="toggleCountry('${countryName}')">Tick / Untick</button>
+                `)
+                .openOn(map);
+        });
+
+        // Initiale Anzeige laden
+        updateDisplay();
+    </script>
+</body>
+</html>
